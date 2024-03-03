@@ -1,0 +1,64 @@
+import cv2
+import numpy as np
+from urllib.request import urlopen
+import tkinter as tk
+from tkinter import filedialog
+from PIL import Image, ImageTk
+
+# Загружаем предварительно обученную модель для распознавания объектов COCO
+net = cv2.dnn.readNetFromTensorflow('ssd_mobilenet_v2_coco/frozen_inference_graph.pb',
+                                    'ssd_mobilenet_v2_coco/ssd_mobilenet_v2_coco.pbtxt')
+
+class WasteSortingApp:
+    def __init__(self, master):
+        self.master = master
+        self.master.title("Распознавание Образов в Системах Сортировки отходов")
+
+        self.canvas = tk.Canvas(self.master, width=400, height=400)
+        self.canvas.pack()
+
+        self.load_button = tk.Button(self.master, text="Загрузить изображение", command=self.load_image)
+        self.load_button.pack()
+
+        self.recognize_button = tk.Button(self.master, text="Распознать", command=self.recognize_image)
+        self.recognize_button.pack()
+
+    def load_image(self):
+        file_path = filedialog.askopenfilename(title="Выберите изображение", filetypes=[("Изображения", "*.png;*.jpg;*.jpeg")])
+        if file_path:
+            self.image = Image.open(file_path)
+            self.display_image()
+
+    def display_image(self):
+        self.tk_image = ImageTk.PhotoImage(self.image)
+        self.canvas.create_image(0, 0, anchor=tk.NW, image=self.tk_image)
+
+    def recognize_image(self):
+        # Преобразование изображения в массив numpy
+        image_np = np.array(self.image)
+
+        # Задаем размер изображения
+        net.setInput(cv2.dnn.blobFromImage(image_np, size=(300, 300), swapRB=True))
+        # Получаем результаты распознавания
+        detections = net.forward()
+
+        # Вывод результатов
+        for i in range(detections.shape[2]):
+            confidence = detections[0, 0, i, 2]
+            if confidence > 0.5:
+                class_id = int(detections[0, 0, i, 1])
+                label = f'Объект: {class_id}'
+                cv2.putText(image_np, label, (20, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+
+        # Отображение изображения с результатами
+        self.display_image_from_np(image_np)
+
+    def display_image_from_np(self, image_np):
+        image_tk = ImageTk.PhotoImage(Image.fromarray(image_np))
+        self.canvas.create_image(0, 0, anchor=tk.NW, image=image_tk)
+        self.tk_image = image_tk
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = WasteSortingApp(root)
+    root.mainloop()
